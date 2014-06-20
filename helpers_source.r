@@ -5,6 +5,7 @@ require(car)
 
 # Adjusted rank transform test (to analyze interaction for heteroskedastic non-normal data)
 # Vovk Mik. Apr. 23-24, 2012
+#			modifid 20.06.2014 - removed doBy dependence ( summaryBy )
 	# Sawilowsky S.S. Nonparametric-Tests of Interaction in Experimental-Design // Rev Educ Res. 1990. V. 60. # 1. P. 91-126.
 	# Leys C., Schumann S. A nonparametric method to analyze interactions: The adjusted rank transform test // Journal of Experimental Social Psychology. 2010. V. 46. # 4. P. 684-688.
 
@@ -12,29 +13,24 @@ test.interaction <- function(x, a, b){
 
 	datt <- data.frame(x=x, a=a, b=b)
 
-	mm <- summaryBy(x ~ a + b, datt, keep.names=T)
-	m.a <- summaryBy(x ~ a, datt, keep.names=T)
-	m.b <- summaryBy(x ~ b, datt, keep.names=T)
+	mm <- with(datt, aggregate(x, list(a=a, b=b), FUN=mean))
+	m.a <- with(datt, aggregate(x, list(a=a), FUN=mean))
+	m.b <- with(datt, aggregate(x, list(b=b), FUN=mean))
 
 	# remove the main effects
 	for(i in 1:length(interaction(mm$a, mm$b))){
+		# filter falues
+		subs <- datt[interaction(datt$a, datt$b) == interaction(mm$a, mm$b)[i],]
 
-	# filter falues
-	subs <- datt[interaction(datt$a, datt$b) == interaction(mm$a, mm$b)[i],]
-
-	# extract corresponding marginal means
+		# extract corresponding marginal means
 		marg.a <- m.a[m.a$a == subs$a[1],]$x	# marginal mean 1
 		marg.b <- m.b[m.b$b == subs$b[1],]$x	# marginal mean 2
 
-	# detrend original values
-	datt[interaction(datt$a, datt$b) == interaction(mm$a, mm$b)[i],]$x <- datt[interaction(datt$a, datt$b) == interaction(mm$a, mm$b)[i],]$x - marg.a - marg.b
-		
+		# detrend original values
+		datt[interaction(datt$a, datt$b) == interaction(mm$a, mm$b)[i],]$x <- datt[interaction(datt$a, datt$b) == interaction(mm$a, mm$b)[i],]$x - marg.a - marg.b
 	}
-	# rm(i, subs, marg.a, marg.b)
-	# mm2 <- summaryBy(x ~ a + b, datt, keep.names=T)
 
 	datt$ranks <- rank(datt$x, ties.method="average")		# calculate ranks
-	# mm3 <- summaryBy(ranks ~ a + b, datt, keep.names=T)
 
 	mod <- lm(ranks ~ a*b, data=datt)
 	an.mod <- Anova(mod)
@@ -99,22 +95,22 @@ extract.glht <- function(x,								# x = summary(glht)
 	digits = max(3, getOption("digits") - 3), ...) {
 
 	res <- data.frame(
-		Ðàçíèöà.Ñðåäíèõ = x$test$coefficients,
-		Ñòä.Îø = x$test$sigma,
+		Mean.Difference = x$test$coefficients,
+		Std.Error = x$test$sigma,
 		P = round(x$test$pvalues, 5)
 		)
 
 	printCoefmat(res, digits = digits, 
         has.Pvalue = TRUE, P.values = TRUE)
 	
-	cat("\nÁóêâû äëÿ ïðîâåäåííûõ ñðàâíåíèé:\n\n")
+	cat("\nÐ‘ÑƒÐºÐ²Ñ‹ Ð´Ð»Ñ Ð¿Ñ€Ð¾Ð²ÐµÐ´ÐµÐ½Ð½Ñ‹Ñ… ÑÑ€Ð°Ð²Ð½ÐµÐ½Ð¸Ð¹:\n\n")
 	pp <- x$test$pvalues                  		    # p-values for comparisons
 	names(pp) <- names(x$test$coefficients)   		# add comparison names
 	lett <- multcompLetters(pp)                     # assign letters [multcompView]
-		ll <- data.frame(Ãðóïïà = names(lett$Letters), Áóêâà = lett$Letters)
+		ll <- data.frame(Group = names(lett$Letters), Letter = lett$Letters)
 		rownames(ll) <- NULL
 	print( ll )
-	cat("\nÎäèíàêîâûå áóêâû îáîçíà÷àþò îòñóòñòâèå îòëè÷èé.\n")
+	cat("\nÐžÐ´Ð¸Ð½Ð°ÐºÐ¾Ð²Ñ‹Ðµ Ð±ÑƒÐºÐ²Ñ‹ Ð¾Ð±Ð¾Ð·Ð½Ð°Ñ‡Ð°ÑŽÑ‚ Ð¾Ñ‚ÑÑƒÑ‚ÑÑ‚Ð²Ð¸Ðµ Ð¾Ñ‚Ð»Ð¸Ñ‡Ð¸Ð¹.\n")
 
 	ret <- list()
 		ret$res <- res
@@ -126,8 +122,9 @@ extract.glht <- function(x,								# x = summary(glht)
 
 
 extract.agricol <- function(x){		# x = result of LSD.test (agricolae)
-	cat("\nÁóêâû äëÿ ïðîâåäåííûõ ñðàâíåíèé:\n\n")
-	ll <- data.frame(Ãðóïïà = x$groups$trt, Áóêâà = x$groups$M)
+	cat("\nÐ‘ÑƒÐºÐ²Ñ‹ Ð´Ð»Ñ Ð¿Ñ€Ð¾Ð²ÐµÐ´ÐµÐ½Ð½Ñ‹Ñ… ÑÑ€Ð°Ð²Ð½ÐµÐ½Ð¸Ð¹:\n\n")
+	ll <- data.frame(Group = x$groups$trt, Letter = x$groups$M)
 	print( ll )
-	cat("\nÎäèíàêîâûå áóêâû îáîçíà÷àþò îòñóòñòâèå îòëè÷èé.\n")
+	cat("\nÐžÐ´Ð¸Ð½Ð°ÐºÐ¾Ð²Ñ‹Ðµ Ð±ÑƒÐºÐ²Ñ‹ Ð¾Ð±Ð¾Ð·Ð½Ð°Ñ‡Ð°ÑŽÑ‚ Ð¾Ñ‚ÑÑƒÑ‚ÑÑ‚Ð²Ð¸Ðµ Ð¾Ñ‚Ð»Ð¸Ñ‡Ð¸Ð¹.\n")
+	invisible(ll)
 }

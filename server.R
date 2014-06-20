@@ -9,37 +9,78 @@
 
 
 
-
 library(car)          # for hccm adjustment
 library(nortest)      # for normality tests
 library(multcomp)     # for Tukey & Dunnet
 library(multcompView) # for multcompLetters
 library(sandwich)     # for vcovHC
-library(doBy)         # used in ART
 library(lmPerm)       # for permutational ANOVA
 library(agricolae)    # for LSD & scheffe
+library(XLConnect)    # to save results in Excel's format
+
 
 source("helpers_source.r")    # useful functions
 
 
 shinyServer(function(input, output) {
 
+#####################
+##################### # load data
+#####################
 
-  parseUserData <- reactive({
-    loadUserData <- function() {
-      sourcePath <- input$dataFile$datapath
-      read.table(file = sourcePath, header=TRUE, sep="\t")
-      }
+## Initial
+#   parseUserData <- reactive({
+#     loadUserData <- function() {
+#       sourcePath <- input$dataFile$datapath
+#       read.table(file = sourcePath, header=TRUE, sep="\t")
+#       }
     
-    # try to load and parse data given by the user.
-    # If an error is thrown - return a text description of what went wrong. 
-    # The value of this function will therefore be either: (a) a data.frame, or
-    # (b) a character vector with error information (we'll test for this below.)
-    tryCatch( loadUserData(), error = function(e) { conditionMessage(e) } )
-  })
+#     ## try to load and parse data given by the user.
+#     ## If an error is thrown - return a text description of what went wrong. 
+#     ## The value of this function will therefore be either: (a) a data.frame, or
+#     ## (b) a character vector with error information (we'll test for this below.)
+#     tryCatch( loadUserData(), error = function(e) { conditionMessage(e) } )
+#   })
 
-# Get the data
+# ## Get the data
+# userData <- reactive({ parseUserData() })
+
+
+parseUserData <- reactive({        # based on code by Huidong Tian  - Flexible upload data
+    inFile <- input$dataFile
+    if (!is.null(inFile)) {
+      # Determine document format;
+      ptn <- "\\.[[:alnum:]]{1,5}$"
+      suf <- tolower(regmatches(inFile$name, regexpr(ptn, inFile$name)))
+      
+      # Options for Excel documents;
+      if (suf %in% c('.xls', '.xlsx')) {
+        wb <- loadWorkbook(inFile$datapath)
+        sheets <- getSheets(wb)
+        dat <- readWorksheet(wb, sheets[1])
+          ind <- sapply(dat, is.character)         # which columns are "chr"
+          dat[ind] <- lapply(dat[ind], factor)     # convert them to factor
+        return(dat)
+      } 
+      
+      # Options for txt documents;
+      if (suf %in% '.txt') {
+        read.table(file = inFile$datapath, header=TRUE, sep="\t")
+      }
+
+    } else {return(NULL)}
+})
+  
+
 userData <- reactive({ parseUserData() })
+
+output$datt.str <- renderPrint( str( userData() ))     # for debug
+
+
+#####################
+##################### # 
+#####################
+
 
 ## Do subset checkbox
 # output$do.subs <- renderUI({
@@ -602,8 +643,7 @@ MULT <- reactive({
 })    # END OF MULT
 
 
-
-# Return the results of multiple comparisons
+# Return the results of multiple comparisons to screen
 output$multcomp <- renderPrint({ 
   if(is.null(input$mult.tt)){ return(
     cat("При необходимости отметьте проведение множественных сравнений.")
@@ -612,11 +652,39 @@ output$multcomp <- renderPrint({
   if(input$mult.tt == "TUKEY"){ return( extract.glht( MULT() )) }   # helpers_source.r
   if(input$mult.tt == "DUNN") { return( extract.glht( MULT() )) }
 
+  if(input$mult.tt == "STBF"){ return( MULT() ) }
+  if(input$mult.tt == "LSD") { return( extract.agricol( MULT() )) }
+  if(input$mult.tt == "SCHEFFE") { return( extract.agricol( MULT() )) }
+})
+
+
+# Convert to talbe that will be saved to file
+MULT.table <- reactive({    
+  if(input$mult.tt == "TUKEY"){ return( extract.glht( MULT() )$res) }   # helpers_source.r
+  if(input$mult.tt == "DUNN") { return( extract.glht( MULT() )$res) }
 
   if(input$mult.tt == "STBF"){ return( MULT() ) }
   if(input$mult.tt == "LSD") { return( extract.agricol( MULT() )) }
   if(input$mult.tt == "SCHEFFE") { return( extract.agricol( MULT() )) }
 })
+
+
+
+## save MULT.table() to file
+# output$download.mult.table <- downloadHandler(
+#     filename = function() { paste("Множественные сравнения-", format(Sys.time(), "%Y-%m-%d__%H-%M"), ".txt", sep="") },
+#     # content = function(file) write.csv(MULT.table(), file)
+#     content = function(file) write.table(MULT.table(), file, quote = F, sep = "\t", col.names = T, row.names = F)
+# )
+
+## generate button
+# output$downl.mult.comp <- renderUI({
+#   if(is.null(input$mult.tt)){ return() }
+#   if(!is.null(input$mult.tt)){ 
+#     downloadButton("download.mult.table", label = "Сохранить множественные сравнения")
+#   }
+# })
+
 
 
 
@@ -758,6 +826,23 @@ output$boxp <- renderPlot({
 
 
 
+# output$plot <- downloadHandler( # a function that opens a connection to a pdf and print the result to it
+#     filename = paste("График_", format(Sys.time(), "%Y-%m-%d__%H-%M"), ".pdf", sep=""),
+#     content = function(FILE=NULL) {
+#       pdf(file=FILE)
+#         plot(...)
+#       dev.off()
+#       }
+# )
+
+
+# # generate button
+# output$downl.plot <- renderUI({
+#     downloadButton('plot', label = "Сохранить график")
+# })
+
+
+
 
 
 
@@ -775,8 +860,23 @@ output$boxp <- renderPlot({
   
 
   
-  ## Dump results
-	# actionButton
+
+
+######################################
+######################################
+######################################
+
+
+#debugging:  print all names and values in input  (based on Dmitry Grapov code)
+output$debug<- renderPrint({
+    # inptut variables:
+    obj <- names(input)
+    input.obj <- lapply(1:length(obj), function(i) { input[[obj[i]]]})
+    names(input.obj) <- obj
+
+    return(list(input = input.obj))
+           # , output = output.obj))
+  })
 
 
 
