@@ -11,7 +11,9 @@ shinyUI(pageWithSidebar(
 
   sidebarPanel(
   # helpText("Текстовый файл с разделителями табуляции."),
-  fileInput( "dataFile", "Загрузить файл", accept="application/vnd.ms-excel"),
+  fileInput("dataFile", "Загрузить файл",
+    accept = c("application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              "text/tab-separated-values", "text/plain")),
   # uiOutput("do.subs"),
   div(class="row"),
     div(class="span5", uiOutput("y.chois")),
@@ -46,46 +48,65 @@ shinyUI(pageWithSidebar(
         dataTableOutput("dt")),
 
       tabPanel("Диагностика и допущения",
-    		h4(p("Визуальная диагностика:")),
-    		div(class="row"),
-    		  div(class="span5", plotOutput("qq")),
-    		  div(class="span5", plotOutput("qq.rand")),
-    		div(class="row"),
-    		p("Ваши данные представлены на левом графике. Наблюдения должны укладываться в диапазон, отмеченный красными линиями. Для сравнения - на правом графике показаны искуственные данные, соответствующие нормальному распределению."),
-    		br(),
+        h4(p("Визуальная диагностика:")),
+        fluidRow(
+          column(6, plotOutput("qq")),
+          column(6, plotOutput("qq.rand"))
+        ),
+
+        div(class="row"),
+        p("Ваши данные представлены на левом графике. Наблюдения должны укладываться в диапазон, отмеченный красными линиями. Для сравнения - на правом графике показаны искуственные данные, соответствующие нормальному распределению."),
+        br(),
         h4(div(uiOutput("y.warning"), style = "color:red")),
-        div(class="row"),
-          div(class="span5", plotOutput("histt")),
-          div(class="span5", plotOutput("y.vs.tr")),
-        div(class="row"),
-          div(class="span5", uiOutput("rug")),
-          div(class="span5", uiOutput("gr.col")),
+        fluidRow(
+          column(6, plotOutput("histt")),
+          column(6, plotOutput("y.vs.tr"))
+        ),
+        fluidRow(
+          column(6, uiOutput("rug")),
+          column(6, uiOutput("gr.col"))
+        ),
         div(class="row"),
         uiOutput("dens"), uiOutput("dens.adj"),
         br(),
-    		h4(p("Формальный тест на нормальность распределения:")),
-    			textOutput("shapiro"), textOutput("lillie"),
-    		h4(p("Тест на однородность дисперсий:")),
-    		("(Зависит от выбора группирующих переменных)"),
-    		p(textOutput("choosed.fact")),
-    		textOutput("homogeneity")
-    	),
+        uiOutput("yeo.lamda"),
+        br(),
+        h4(p("Формальный тест на нормальность распределения:")),
+          textOutput("shapiro"), textOutput("lillie"),
+        h4(p("Тест на однородность дисперсий:")),
+        ("(Зависит от выбора группирующих переменных)"),
+        p(textOutput("choosed.fact")),
+        textOutput("homogeneity")
+      ),
       
 
       tabPanel("Результаты анализа",
         verbatimTextOutput("ress"),
         br(),
-        div(class="row"),
-          div(class="span9", plotOutput("boxp")),
-          div(class="span2", uiOutput("boxo")),
+        fluidRow(
+          column(9, plotOutput("boxp")),
+          column(2, uiOutput("boxo"))
+        ),
         div(class="row"),
         # uiOutput("letter.diff"),
         verbatimTextOutput("multcomp")
       ),
 
+      tabPanel("Сохранить результаты",
+      h4("Сохранить результаты анализа:"),
+      p("Здесь можно выбрать результаты, которые необходимо сохранить в табличном виде."),
+      br(),
+      downloadButton('downloadData.anov', 'Дисперсионный анализ'),
+      br(),
+      downloadButton('downloadData.multcomp', 'Множественные сравнения'),
+      br(),
+      downloadButton('downloadData.data', 'Данные для анализа (с учетом трансформации)')
+      ),
+
+
       tabPanel("Debug",
-      	h5("Служебная информация, предназначенная для отладки работы приложения.", style = "color:darkred"),
-      	verbatimTextOutput("debug"),		     # return input and stored values
+        h5("Служебная информация, предназначенная для отладки работы приложения.", style = "color:darkred"),
+        verbatimTextOutput("debug"),		     # return input and stored values
         h5("Структура данных:", style = "color:darkred"),
         verbatimTextOutput("datt.str")
       ),
@@ -152,6 +173,7 @@ shinyUI(pageWithSidebar(
         h4("История версий:"),
         p(" v.0.1.0 (28.05.2014) - Первый публичный релиз."),
         p(" v.0.1.2 (20.06.2014) - Добавлен импорт данных из файлов Excel; мелкие исправления."),
+        p(" v.0.1.3 (xx.xx.2015) - Добавлен экспорт результатов, отображение параметра преобразования Йео–Джонсона; мелкие исправления."),
         br()
       ),
 

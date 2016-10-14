@@ -5,7 +5,13 @@
 ## TO DO:
 # Warning in `$.data.frame`(leveneTest(form, data = datt), Pr) :
   # Name partially matched in data frame
+# Add parser of anova-results for different tests
 # Add Brown–Forsythe test
+# Add letters to boxplot (http://menugget.blogspot.ru/2014/05/automated-determination-of-distribution.html#more)
+# Make xls-files visible
+# Add progress indication
+	# https://github.com/rstudio/shiny-examples/tree/master/058-progress-example
+	# https://stackoverflow.com/questions/18237987/show-that-shiny-is-busy-or-loading-when-changing-tab-panels
 
 
 
@@ -16,7 +22,7 @@ library(multcompView) # for multcompLetters
 library(sandwich)     # for vcovHC
 library(lmPerm)       # for permutational ANOVA
 library(agricolae)    # for LSD & scheffe
-library(XLConnect)    # to save results in Excel's format
+# library(XLConnect)    # to save results in Excel's format
 
 
 source("helpers_source.r")    # useful functions
@@ -140,7 +146,8 @@ output$transformation <- renderUI({
   if(is.null(input$dataFile)) { return() }
   radioButtons("transf", "Трансформация зависимой переменной:",
               list("Без трансформации" = "no",
-                   "Логарифм (натуральный + 1)" = "lg",
+                   "Логарифм (натуральный)" = "lg",
+                   "Логарифм + 1" = "lg1",
                    "Квадратный корень" = "sqr",
                    "Кубический корень" = "cbr",
                    "Преобразование Йео–Джонсона" = "YJ",
@@ -154,7 +161,8 @@ output$transformation <- renderUI({
   ######################################### ## First tab with data
   #########################################
 
-  output$dt <- renderDataTable(userData(), options = list(iDisplayLength = 8))
+  # output$dt <- renderDataTable(userData(), options = list(iDisplayLength = 8))
+  output$dt <- renderDataTable(userData(), options = list(pageLength = 8))
   output$nrow <- renderText({ 
       if(is.null(input$dataFile)) { return() }
       paste("Наблюдений - ", nrow(userData()), sep="") })
@@ -174,8 +182,11 @@ y.tr <- reactive({
 		y.tr <- y }
 
 	if(input$transf == "lg"){
-		y.tr <- log(y+1) }
+		y.tr <- log(y) }
 	
+  if(input$transf == "lg1"){
+    y.tr <- log(y+1) }
+
 	if(input$transf == "sqr"){
 		y.tr <- sqrt(y) }
     
@@ -279,6 +290,21 @@ output$histt <- renderPlot({             # histogram
 
   if(input$show.rug)   { rug(y.tr()) }
 })
+
+
+# Yeo-Johnson lamda show
+output$yeo.lamda <- renderText({
+  if(is.null(input$dataFile)) { return() }
+  if(input$transf != "YJ")    { return() }
+  if(input$transf == "YJ")    { 
+    datt <- userData()
+    y <- datt[,input$responseColumn]
+    lambda <- coef(powerTransform(y, family="yjPower"), round=TRUE)
+    yj.text <- paste("Использовано преобразование Йео–Джонсона, параметр λ = ", lambda, ".", sep="")
+    return(yj.text)
+  }
+})
+
 
 # Color groups?
 output$gr.col <- renderUI({
@@ -685,7 +711,18 @@ MULT.table <- reactive({
 #   }
 # })
 
-
+## download results 
+# output$download.mult.table <- downloadHandler(
+#  filename = function() { "output.xlsx" },
+#  content = function(file){
+#       fname <- paste(file, "xlsx", sep=".")
+#       wb <- loadWorkbook(fname, create = TRUE)
+#       createSheet(wb, name = "MultComp")
+#       writeWorksheet(wb, c(1:3), sheet = "MultComp") # writes numbers 1:3 in file ---> paste object to save here
+#       saveWorkbook(wb)
+#       file.rename(fname, file)
+#     }
+# )
 
 
 # Build the boxplot
