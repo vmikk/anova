@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/20097157.svg)](https://zenodo.org/badge/latestdoi/20097157)
+
 anova
 =====
 
